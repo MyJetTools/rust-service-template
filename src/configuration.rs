@@ -28,7 +28,6 @@ pub async fn read_from_url<T>() -> Result<T, ()> where T: DeserializeOwned {
                 Ok(response) => {
                     let bytes = response.bytes().await.unwrap();
                     let data = bytes.to_vec();
-                    println!("{:?}", data);
                     let result: T = serde_yaml::from_slice(&data).unwrap();
                     return Ok(result);
                 }
