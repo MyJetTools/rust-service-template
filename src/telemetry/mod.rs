@@ -1,4 +1,3 @@
-mod elastic_layer;
 mod telemetry;
 mod elastic_sink;
 mod formatting_layer;

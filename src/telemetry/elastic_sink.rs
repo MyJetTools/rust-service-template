@@ -8,7 +8,7 @@ use std::{
 use tokio::{sync::{
     mpsc::{UnboundedReceiver, UnboundedSender},
     RwLock,
-}, io::AsyncWriteExt};
+}, io::AsyncWriteExt, net::TcpStream};
 
 use tokio::net::TcpSocket;
 
@@ -49,7 +49,7 @@ impl ElasticSink {
 
 impl std::io::Write for ElasticWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        //self.buffer.push(buf.to_vec());
+        std::io::stdout().write_all(&buf).unwrap();
         self.sender.send(buf.to_vec()).unwrap();
         Ok(buf.len())
     }
@@ -68,16 +68,39 @@ async fn log_writer_thread(mut recv: UnboundedReceiver<Vec<u8>>, data: Arc<RwLoc
 
 //Executes each second
 async fn log_flusher_thread(log_stash_url: SocketAddr, data: Arc<RwLock<Vec<Vec<u8>>>>) {
-    let socket = TcpSocket::new_v4().unwrap();
-    let mut stream = socket.connect(log_stash_url).await.unwrap();
+    let socket:TcpSocket;
+    let socket_result = TcpSocket::new_v4();
+
+    match socket_result {
+        Ok(x) => {socket = x},
+        Err(err) => {
+            println!("Can't create socket for logs {:?}", err);
+            panic!("Can't create socket for logs {:?}", err);
+        },
+    }
+
+    let connect_res = socket.connect(log_stash_url).await;
+    let mut stream:TcpStream;
+
+    match connect_res {
+        Ok(x) => {stream = x;},
+        Err(err) => {
+            println!("Can't connect to logstash server {:?}", err);
+            panic!("Can't connect to logstash server {:?}", err);
+        },
+    }
 
     loop {
         let mut write_access = data.as_ref().write().await;
         while let Some(res) = write_access.pop() {
-            std::io::stdout().write_all(&res).unwrap();
-            stream.write(&res).await.unwrap();
+            
+            let send_res = stream.write(&res).await;
+            match send_res {
+                Ok(size) => {println!("Send logs {:?}", size)},
+                Err(err) => println!("Can't write logs to logstash server {:?}", err),
+            }
         }
 
-        tokio::time::sleep(Duration::from_millis(500)).await
+        tokio::time::sleep(Duration::from_millis(250)).await
     }
 }
