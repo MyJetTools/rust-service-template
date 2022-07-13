@@ -17,6 +17,11 @@ name = "rust-service-template"
 
 #Runtime
 tokio = { version = "*", features = ["full"] }
+rand = "*"
+anyhow = "*"
+lazy_static = "1.4.0"
+time = { version = "0.3", default-features = false, features = ["formatting"] }
+gethostname = "0.2.1"
 
 #HTTP
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls", "cookies"] }
@@ -26,3 +31,12 @@ serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 serde_derive = "*"
 serde_yaml = "*"
+
+#Logging and tracing
+log = "0.4"
+tracing = "0.1.19"
+tracing-subscriber = { version = "0.3", features = ["registry", "env-filter"] }
+tracing-bunyan-formatter = "0.3"
+tracing-log = "0.1.1"
+tracing-appender = "0.2.2"
+tracing-core = "0.1.10"
