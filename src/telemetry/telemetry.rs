@@ -24,12 +24,11 @@ where
     let env_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(env_filter));
     let formatting_layer = CustomFormattingLayer::new(name, sink);
-    //let elastic_layer = ElasticLayer::new().unwrap();
+    
     let subscriber = Registry::default()
         .with(env_filter)
         .with(JsonStorageLayer)
         .with(formatting_layer);
-    //.with(elastic_layer)
 
     subscriber
 }

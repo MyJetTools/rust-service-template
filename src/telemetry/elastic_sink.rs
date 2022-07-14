@@ -68,27 +68,7 @@ async fn log_writer_thread(mut recv: UnboundedReceiver<Vec<u8>>, data: Arc<RwLoc
 
 //Executes each second
 async fn log_flusher_thread(log_stash_url: SocketAddr, data: Arc<RwLock<Vec<Vec<u8>>>>) {
-    let socket:TcpSocket;
-    let socket_result = TcpSocket::new_v4();
-
-    match socket_result {
-        Ok(x) => {socket = x},
-        Err(err) => {
-            println!("Can't create socket for logs {:?}", err);
-            panic!("Can't create socket for logs {:?}", err);
-        },
-    }
-
-    let connect_res = socket.connect(log_stash_url).await;
-    let mut stream:TcpStream;
-
-    match connect_res {
-        Ok(x) => {stream = x;},
-        Err(err) => {
-            println!("Can't connect to logstash server {:?}", err);
-            panic!("Can't connect to logstash server {:?}", err);
-        },
-    }
+    let mut stream = connect_to_socket(log_stash_url).await;
 
     loop {
         let mut write_access = data.as_ref().write().await;
@@ -103,4 +83,26 @@ async fn log_flusher_thread(log_stash_url: SocketAddr, data: Arc<RwLock<Vec<Vec<
 
         tokio::time::sleep(Duration::from_millis(250)).await
     }
+}
+
+async fn connect_to_socket(log_stash_url: SocketAddr) -> TcpStream {
+    let socket:TcpSocket;
+    let socket_result = TcpSocket::new_v4();
+    match socket_result {
+        Ok(x) => {socket = x},
+        Err(err) => {
+            println!("Can't create socket for logs {:?}", err);
+            panic!("Can't create socket for logs {:?}", err);
+        },
+    }
+    let connect_res = socket.connect(log_stash_url).await;
+    let mut stream:TcpStream;
+    match connect_res {
+        Ok(x) => {stream = x;},
+        Err(err) => {
+            println!("Can't connect to logstash server {:?}", err);
+            panic!("Can't connect to logstash server {:?}", err);
+        },
+    }
+    stream
 }
