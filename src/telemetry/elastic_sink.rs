@@ -1,16 +1,20 @@
-use std::{
-    io::Write,
-    net::SocketAddr,
-    sync::{Arc, Mutex},
-    time::Duration,
+use std::sync::{Arc};
+use std::net::SocketAddr;
+use std::time::Duration;
+
+use tokio::io::AsyncWriteExt;
+use tokio::{
+    net::TcpStream,
+    sync::{
+        mpsc::{UnboundedReceiver, UnboundedSender},
+        RwLock,
+    },
+    task::JoinHandle,
 };
 
-use tokio::{sync::{
-    mpsc::{UnboundedReceiver, UnboundedSender},
-    RwLock,
-}, io::AsyncWriteExt, net::TcpStream};
-
 use tokio::net::TcpSocket;
+
+use crate::app::AppContext;
 
 /* lazy_static::lazy_static! {
     pub static ref SINK: ElasticSink = ElasticSink::new();
@@ -19,6 +23,8 @@ use tokio::net::TcpSocket;
 pub struct ElasticSink {
     buffer: Arc<RwLock<Vec<Vec<u8>>>>,
     sender: UnboundedSender<Vec<u8>>,
+    log_writer: JoinHandle<()>,
+    log_flusher: JoinHandle<()>,
 }
 
 pub struct ElasticWriter {
@@ -26,16 +32,22 @@ pub struct ElasticWriter {
 }
 
 impl ElasticSink {
-    pub fn new(log_stash_url: SocketAddr) -> Self {
+    pub fn new(log_stash_url: SocketAddr, app_context: Arc<AppContext>) -> Self {
         let (sender, recv) = tokio::sync::mpsc::unbounded_channel();
 
+        let buffer = Arc::new(RwLock::new(vec![]));
+        let log_flusher = tokio::spawn(log_flusher_thread(
+            log_stash_url,
+            buffer.clone(),
+            app_context.clone(),
+        ));
+        let log_writer = tokio::spawn(log_writer_thread(recv, buffer.clone()));
         let res = Self {
-            buffer: Arc::new(RwLock::new(vec![])),
+            buffer: buffer,
             sender: sender.clone(),
+            log_flusher: log_flusher,
+            log_writer: log_writer,
         };
-
-        tokio::spawn(log_writer_thread(recv, res.buffer.clone()));
-        tokio::spawn(log_flusher_thread(log_stash_url, res.buffer.clone()));
 
         res
     }
@@ -67,18 +79,27 @@ async fn log_writer_thread(mut recv: UnboundedReceiver<Vec<u8>>, data: Arc<RwLoc
 }
 
 //Executes each second
-async fn log_flusher_thread(log_stash_url: SocketAddr, data: Arc<RwLock<Vec<Vec<u8>>>>) {
+async fn log_flusher_thread(
+    log_stash_url: SocketAddr,
+    data: Arc<RwLock<Vec<Vec<u8>>>>,
+    app_context: Arc<AppContext>,
+) {
     let mut stream = connect_to_socket(log_stash_url).await;
 
     loop {
         let mut write_access = data.as_ref().write().await;
         while let Some(res) = write_access.pop() {
-            
             let send_res = stream.write(&res).await;
             match send_res {
-                Ok(size) => {println!("Send logs {:?}", size)},
+                Ok(size) => {
+                    println!("Send logs {:?}", size)
+                }
                 Err(err) => println!("Can't write logs to logstash server {:?}", err),
             }
+        }
+
+        if app_context.is_shutting_down() {
+            return;
         }
 
         tokio::time::sleep(Duration::from_millis(250)).await
@@ -86,23 +107,25 @@ async fn log_flusher_thread(log_stash_url: SocketAddr, data: Arc<RwLock<Vec<Vec<
 }
 
 async fn connect_to_socket(log_stash_url: SocketAddr) -> TcpStream {
-    let socket:TcpSocket;
+    let socket: TcpSocket;
     let socket_result = TcpSocket::new_v4();
     match socket_result {
-        Ok(x) => {socket = x},
+        Ok(x) => socket = x,
         Err(err) => {
             println!("Can't create socket for logs {:?}", err);
             panic!("Can't create socket for logs {:?}", err);
-        },
+        }
     }
     let connect_res = socket.connect(log_stash_url).await;
-    let mut stream:TcpStream;
+    let stream: TcpStream;
     match connect_res {
-        Ok(x) => {stream = x;},
+        Ok(x) => {
+            stream = x;
+        }
         Err(err) => {
             println!("Can't connect to logstash server {:?}", err);
             panic!("Can't connect to logstash server {:?}", err);
-        },
+        }
     }
     stream
 }

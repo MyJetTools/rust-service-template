@@ -5,3 +5,4 @@ pub mod telemetry;
 pub mod settings_model;
 pub mod services;
 pub mod generated_proto;
+pub mod app;

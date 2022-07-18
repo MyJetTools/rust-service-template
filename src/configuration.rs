@@ -1,4 +1,4 @@
-use serde::{de::DeserializeOwned, Serialize, Deserialize};
+use serde::{de::DeserializeOwned};
 use tokio::{fs::File, io::AsyncReadExt};
 
 pub struct SettingsReader {}
@@ -87,7 +87,7 @@ fn get_settings_filename() -> String {
 
 #[cfg(test)]
 mod tests {
-    use serde::{de::DeserializeOwned, Deserialize, Serialize};
+    use serde::{Deserialize, Serialize};
 
     use super::SettingsReader;
 
