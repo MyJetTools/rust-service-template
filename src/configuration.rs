@@ -1,6 +1,12 @@
 use serde::{de::DeserializeOwned};
 use tokio::{fs::File, io::AsyncReadExt};
 
+pub struct EndpointConfig {
+    pub grpc_port: String,
+    pub http_port: String,
+    pub environment: String,
+    pub base_url: String,
+}
 pub struct SettingsReader {}
 
 impl SettingsReader {
@@ -13,6 +19,23 @@ impl SettingsReader {
             return Ok(result);
         } else {
             return Err(());
+        }
+    }
+
+    pub fn read_endpoint_settings() -> EndpointConfig {
+        let environment = std::env::var("ENVIRONMENT".to_string()).unwrap_or("DEV".into());
+        let http_port = std::env::var("HTTP_PORT".to_string()).unwrap_or("8080".into());
+        let grpc_port = std::env::var("GRPC_PORT".to_string()).unwrap_or("80".into());
+        let base_url = (match environment.as_str() {
+            _ => "127.0.0.1",
+            "PROD" => "0.0.0.0",
+        }).to_string();
+
+        EndpointConfig {
+            grpc_port,
+            http_port,
+            environment,
+            base_url,
         }
     }
 }

@@ -1,26 +1,20 @@
 use std::fmt::{Debug, Display};
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
-use std::time::Duration;
-
-use rust_grpc_service::bookstore_server::BookstoreServer;
+use std::sync::Arc;
 use rust_service_template::app::AppContext;
-use rust_service_template::configuration::SettingsReader;
-use rust_service_template::generated_proto::bookstore_client::BookstoreClient;
-use rust_service_template::generated_proto::{rust_grpc_service, GetBookRequest};
-use rust_service_template::services::BookStoreImpl;
+use rust_service_template::configuration::{SettingsReader};
+use rust_service_template::server::{run_grpc_server, run_http_server};
 use rust_service_template::settings_model::SettingsModel;
 use rust_service_template::telemetry::{get_subscriber, init_subscriber, ElasticSink};
 use tokio::signal;
 use tokio::task::JoinError;
-use tonic::transport::Server;
-use uuid::Uuid;
 
 #[tokio::main]
 async fn main() {
     let settings = SettingsReader::read_settings::<SettingsModel>()
         .await
         .expect("Can't get settings!");
+    let endpoint_config = Arc::new(SettingsReader::read_endpoint_settings());
     //ElasticSink::new("127.0.0.1:7878".to_string().parse().unwrap());
     let subscriber = get_subscriber("rust_service_template".into(), "info".into(), move || {
         std::io::stdout() //sink.create_writer()
@@ -28,9 +22,9 @@ async fn main() {
     init_subscriber(subscriber);
 
     let app = Arc::new(AppContext::new(&settings));
-    let app_clone = app.clone();
+    //let app_clone = app.clone();
     //JUST A GRPC EXAMPLE
-    let client_pereodic_task = tokio::spawn(async move {
+    /* let client_pereodic_task = tokio::spawn(async move {
         let app = app_clone;
         loop {
             if app.is_shutting_down() {
@@ -48,40 +42,21 @@ async fn main() {
 
             println!("RESPONSE={:?}", response);
         }
-    });
+    }); */
 
-    let server = tokio::spawn(run());
+    let grpc_server = tokio::spawn(run_grpc_server(endpoint_config.clone(), app.clone()));
+    let http_server = tokio::spawn(run_http_server(endpoint_config.clone(), app.clone()));
 
     tokio::select! {
-        o = server => report_exit("GRPC_SERVER", o),
-        o = signal::ctrl_c() => {
+        o = grpc_server => report_exit("GRPC_SERVER", o),
+        o = http_server => report_exit("HTTP_SERVER", o),
+        _ = signal::ctrl_c() => {
             println!("Stop signal received!");
             let shut_down = app.states.shutting_down.clone();
             shut_down.store(true, Ordering::Relaxed); },
     };
 
-    client_pereodic_task.await.unwrap();
-}
-
-async fn run() -> Result<(), std::io::Error> {
-    let addr = "127.0.0.1:5012".parse().unwrap();
-    let bookstore = BookStoreImpl::default();
-
-    println!("GRPC server listening on {}", addr);
-    Server::builder()
-        .trace_fn(|req| {
-            tracing::info_span!(
-                "grpc_call",
-                grpc_request = format!("{:?}", req),
-                trace_id = format!("{}", Uuid::new_v4())
-            )
-        })
-        .add_service(BookstoreServer::new(bookstore))
-        .serve(addr)
-        .await
-        .unwrap();
-
-    Ok(())
+    //client_pereodic_task.await.unwrap();
 }
 
 fn report_exit(task_name: &str, outcome: Result<Result<(), impl Debug + Display>, JoinError>) {
