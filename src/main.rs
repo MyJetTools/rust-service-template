@@ -1,11 +1,11 @@
-use std::fmt::{Debug, Display};
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
 use rust_service_template::app::AppContext;
-use rust_service_template::configuration::{SettingsReader};
+use rust_service_template::configuration::{EndpointConfig, SettingsReader};
 use rust_service_template::server::{run_grpc_server, run_http_server};
 use rust_service_template::settings_model::SettingsModel;
 use rust_service_template::telemetry::{get_subscriber, init_subscriber, ElasticSink};
+use std::fmt::{format, Debug, Display};
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use tokio::signal;
 use tokio::task::JoinError;
 
@@ -22,41 +22,23 @@ async fn main() {
     init_subscriber(subscriber);
 
     let app = Arc::new(AppContext::new(&settings));
-    //let app_clone = app.clone();
     //JUST A GRPC EXAMPLE
-    /* let client_pereodic_task = tokio::spawn(async move {
-        let app = app_clone;
-        loop {
-            if app.is_shutting_down() {
-                println!("STOP CLIENT");
-                return;
-            }
-            tokio::time::sleep(Duration::from_millis(10_000)).await;
-            let mut client = BookstoreClient::connect("http://127.0.0.1:5012")
-                .await
-                .unwrap();
-
-            let request = tonic::Request::new(GetBookRequest { id: "123".into() });
-
-            let response = client.get_book(request).await.unwrap();
-
-            println!("RESPONSE={:?}", response);
-        }
-    }); */
+    let client_pereodic_task = tokio::spawn(start_test(app.clone(), endpoint_config.clone()));
 
     let grpc_server = tokio::spawn(run_grpc_server(endpoint_config.clone(), app.clone()));
     let http_server = tokio::spawn(run_http_server(endpoint_config.clone(), app.clone()));
 
     tokio::select! {
-        o = grpc_server => report_exit("GRPC_SERVER", o),
-        o = http_server => report_exit("HTTP_SERVER", o),
         _ = signal::ctrl_c() => {
             println!("Stop signal received!");
             let shut_down = app.states.shutting_down.clone();
-            shut_down.store(true, Ordering::Relaxed); },
+            shut_down.store(true, Ordering::Relaxed);
+        },
+        o = grpc_server => {report_exit("GRPC_SERVER", o);}
+        o = http_server => {report_exit("GRPC_SERVER", o);}
     };
-
-    //client_pereodic_task.await.unwrap();
+    
+    client_pereodic_task.await.unwrap();
 }
 
 fn report_exit(task_name: &str, outcome: Result<Result<(), impl Debug + Display>, JoinError>) {
@@ -80,5 +62,31 @@ fn report_exit(task_name: &str, outcome: Result<Result<(), impl Debug + Display>
                 task_name
             )
         }
+    }
+}
+
+async fn start_test(
+    app: Arc<AppContext>,
+    endpoint: Arc<EndpointConfig>,
+) -> Result<(), tonic::transport::Error> {
+    loop {
+        if app.is_shutting_down() {
+            println!("STOP CLIENT");
+            return Ok(());
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10_000)).await;
+        let mut client =
+            rust_service_template::generated_proto::bookstore_client::BookstoreClient::connect(
+                format!("http://{}:{}", endpoint.base_url, endpoint.grpc_port),
+            )
+            .await?;
+
+        let request = tonic::Request::new(rust_service_template::generated_proto::GetBookRequest {
+            id: "123".into(),
+        });
+
+        let response = client.get_book(request).await.unwrap();
+
+        println!("RESPONSE={:?}", response);
     }
 }
