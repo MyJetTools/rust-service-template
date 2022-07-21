@@ -1,4 +1,6 @@
-use crate::settings_model::SettingsModel;
+use std::sync::Arc;
+
+use crate::{settings_model::SettingsModel, domain::{Database, RequestCounter, DatabaseImpl}};
 
 use super::global_states::GlobalStates;
 
@@ -6,6 +8,7 @@ pub const APP_VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 pub struct AppContext {
     pub states: GlobalStates,
+    pub database: Arc<dyn Database<RequestCounter> + Sync + Send>
 }
 
 impl AppContext {
@@ -13,6 +16,7 @@ impl AppContext {
 
         Self {
             states: GlobalStates::new(),
+            database: Arc::new(DatabaseImpl::new()),
         }
     }
 

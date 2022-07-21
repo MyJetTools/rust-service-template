@@ -7,3 +7,4 @@ pub mod services;
 pub mod generated_proto;
 pub mod app;
 pub mod server;
+pub mod domain;

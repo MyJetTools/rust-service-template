@@ -19,4 +19,5 @@ message GetBookResponse {
   string name = 2;
   string author = 3;
   int32 year = 4;
+  int64 counter = 5;
 }

@@ -4,18 +4,18 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::{
-    app::{AppContext, self}, configuration::EndpointConfig,
+    app::{AppContext, self}, configuration::EnvConfig,
     generated_proto::bookstore_server::BookstoreServer, services::BookStoreImpl,
 };
 
 pub async fn  run_grpc_server(
-    endpoint_config: Arc<EndpointConfig>,
+    env_config: Arc<EnvConfig>,
     app_context: Arc<AppContext>,
 ) -> Result<(), std::io::Error> {
-    let addr = format!("{}:{}", endpoint_config.base_url, endpoint_config.grpc_port)
+    let addr = format!("{}:{}", env_config.base_url, env_config.grpc_port)
         .parse()
         .unwrap();
-    let bookstore = BookStoreImpl::default();
+    let bookstore = BookStoreImpl::new(app_context);
 
     println!("GRPC server listening on {}", addr);
     tonic::transport::Server::builder()
@@ -51,10 +51,10 @@ pub struct IsAlive {
 }
 
 pub async fn run_http_server(
-    endpoint_config: Arc<EndpointConfig>,
+    env_config: Arc<EnvConfig>,
     app_context: Arc<AppContext>,
 ) -> Result<(), hyper::Error> {
-    let addr = format!("{}:{}", endpoint_config.base_url, endpoint_config.http_port)
+    let addr = format!("{}:{}", env_config.base_url, env_config.http_port)
         .parse()
         .unwrap();
     println!("HTTP server listening on {}", addr);

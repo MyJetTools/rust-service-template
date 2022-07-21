@@ -15,6 +15,8 @@ pub struct GetBookResponse {
     pub author: ::prost::alloc::string::String,
     #[prost(int32, tag="4")]
     pub year: i32,
+    #[prost(int64, tag="5")]
+    pub counter: i64,
 }
 /// Generated client implementations.
 pub mod bookstore_client {

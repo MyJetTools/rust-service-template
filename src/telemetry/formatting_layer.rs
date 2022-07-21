@@ -1,10 +1,11 @@
-use tracing_bunyan_formatter::{JsonStorage};
 use serde::ser::{SerializeMap, Serializer};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fmt;
 use std::io::Write;
+use time::format_description::well_known::Rfc3339;
 use tracing::{Event, Id, Subscriber};
+use tracing_bunyan_formatter::JsonStorage;
 use tracing_core::metadata::Level;
 use tracing_core::span::Attributes;
 use tracing_log::AsLog;
@@ -12,7 +13,6 @@ use tracing_subscriber::fmt::MakeWriter;
 use tracing_subscriber::layer::Context;
 use tracing_subscriber::registry::SpanRef;
 use tracing_subscriber::Layer;
-use time::format_description::well_known::Rfc3339;
 
 /// Keys for core fields of the Bunyan format (https://github.com/trentm/node-bunyan#core-fields)
 const BUNYAN_VERSION: &str = "v";
@@ -23,12 +23,23 @@ const PID: &str = "pid";
 const TIME: &str = "time";
 const MESSAGE: &str = "msg";
 const _SOURCE: &str = "src";
+const INDEX: &str = "index";
+const ENV: &str = "env";
 
-const BUNYAN_RESERVED_FIELDS: [&str; 7] =
-    [BUNYAN_VERSION, LEVEL, NAME, HOSTNAME, PID, TIME, MESSAGE];
+const BUNYAN_RESERVED_FIELDS: [&str; 9] = [
+    BUNYAN_VERSION,
+    LEVEL,
+    NAME,
+    HOSTNAME,
+    PID,
+    TIME,
+    MESSAGE,
+    INDEX,
+    ENV,
+];
 
 /// Convert from log levels to Bunyan's levels.
-fn to_bunyan_level(level: &Level) -> &str{
+fn to_bunyan_level(level: &Level) -> &str {
     match level.as_log() {
         log::Level::Error => "Error",
         log::Level::Warn => "Warn",
@@ -48,6 +59,8 @@ pub struct CustomFormattingLayer<W: for<'a> MakeWriter<'a> + 'static> {
     bunyan_version: u8,
     name: String,
     default_fields: HashMap<String, Value>,
+    index: String,
+    env: String,
 }
 
 impl<W: for<'a> MakeWriter<'a> + 'static> CustomFormattingLayer<W> {
@@ -70,11 +83,15 @@ impl<W: for<'a> MakeWriter<'a> + 'static> CustomFormattingLayer<W> {
     ///
     /// let formatting_layer = BunyanFormattingLayer::new("tracing_example".into(), || std::io::stdout());
     /// ```
-    pub fn new(name: String, make_writer: W) -> Self {
-        Self::with_default_fields(name, make_writer, HashMap::new())
+    pub fn new(name: String, make_writer: W, index: String, env: String) -> Self {
+        Self::with_default_fields(name, make_writer, HashMap::new(), index, env)
     }
 
-    pub fn with_default_fields(name: String, make_writer: W, default_fields: HashMap<String, Value>) -> Self {
+    pub fn with_default_fields(
+        name: String,
+        make_writer: W,
+        default_fields: HashMap<String, Value>, index: String, env: String
+    ) -> Self {
         Self {
             make_writer,
             name,
@@ -82,6 +99,8 @@ impl<W: for<'a> MakeWriter<'a> + 'static> CustomFormattingLayer<W> {
             hostname: gethostname::gethostname().to_string_lossy().into_owned(),
             bunyan_version: 0,
             default_fields,
+            index: index,
+            env: env,
         }
     }
 
@@ -97,6 +116,8 @@ impl<W: for<'a> MakeWriter<'a> + 'static> CustomFormattingLayer<W> {
         map_serializer.serialize_entry(LEVEL, &to_bunyan_level(level))?;
         map_serializer.serialize_entry(HOSTNAME, &self.hostname)?;
         map_serializer.serialize_entry(PID, &self.pid)?;
+        map_serializer.serialize_entry(INDEX, &self.index)?;
+        map_serializer.serialize_entry(ENV, &self.env)?;
         if let Ok(time) = &time::OffsetDateTime::now_utc().format(&Rfc3339) {
             map_serializer.serialize_entry(TIME, time)?;
         }
@@ -127,9 +148,9 @@ impl<W: for<'a> MakeWriter<'a> + 'static> CustomFormattingLayer<W> {
                 map_serializer.serialize_entry(key, value)?;
             } else {
                 tracing::debug!(
-                        "{} is a reserved field in the bunyan log format. Skipping it.",
-                        key
-                    );
+                    "{} is a reserved field in the bunyan log format. Skipping it.",
+                    key
+                );
             }
         }
 
@@ -257,10 +278,9 @@ where
             map_serializer.serialize_entry("file", &event.metadata().file())?;
 
             // Add all default fields
-            for (key, value) in self.default_fields
-                .iter()
-                .filter(|(key, _)| key.as_str() != "message" && !BUNYAN_RESERVED_FIELDS.contains(&key.as_str()))
-            {
+            for (key, value) in self.default_fields.iter().filter(|(key, _)| {
+                key.as_str() != "message" && !BUNYAN_RESERVED_FIELDS.contains(&key.as_str())
+            }) {
                 map_serializer.serialize_entry(key, value)?;
             }
 

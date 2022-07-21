@@ -1,5 +1,5 @@
 use rust_service_template::app::AppContext;
-use rust_service_template::configuration::{EndpointConfig, SettingsReader};
+use rust_service_template::configuration::{EnvConfig, SettingsReader};
 use rust_service_template::server::{run_grpc_server, run_http_server};
 use rust_service_template::settings_model::SettingsModel;
 use rust_service_template::telemetry::{get_subscriber, init_subscriber, ElasticSink};
@@ -14,19 +14,27 @@ async fn main() {
     let settings = SettingsReader::read_settings::<SettingsModel>()
         .await
         .expect("Can't get settings!");
-    let endpoint_config = Arc::new(SettingsReader::read_endpoint_settings());
-    //ElasticSink::new("127.0.0.1:7878".to_string().parse().unwrap());
-    let subscriber = get_subscriber("rust_service_template".into(), "info".into(), move || {
-        std::io::stdout() //sink.create_writer()
-    });
-    init_subscriber(subscriber);
 
     let app = Arc::new(AppContext::new(&settings));
-    //JUST A GRPC EXAMPLE
-    let client_pereodic_task = tokio::spawn(start_test(app.clone(), endpoint_config.clone()));
 
-    let grpc_server = tokio::spawn(run_grpc_server(endpoint_config.clone(), app.clone()));
-    let http_server = tokio::spawn(run_http_server(endpoint_config.clone(), app.clone()));
+    let env_config = Arc::new(SettingsReader::read_env_settings());
+    let sink = ElasticSink::new(
+        "192.168.70.8:5044".to_string().parse().unwrap(),
+        app.clone(),
+    );
+    let subscriber = get_subscriber(
+        "rust_service_template".into(),
+        "info".into(),
+        move || sink.create_writer(),
+        env_config.index.clone(),
+        env_config.environment.clone(),
+    );
+    init_subscriber(subscriber);
+    //JUST A GRPC EXAMPLE
+    let client_pereodic_task = tokio::spawn(start_test(app.clone(), env_config.clone()));
+
+    let grpc_server = tokio::spawn(run_grpc_server(env_config.clone(), app.clone()));
+    let http_server = tokio::spawn(run_http_server(env_config.clone(), app.clone()));
 
     tokio::select! {
         _ = signal::ctrl_c() => {
@@ -37,7 +45,7 @@ async fn main() {
         o = grpc_server => {report_exit("GRPC_SERVER", o);}
         o = http_server => {report_exit("GRPC_SERVER", o);}
     };
-    
+
     client_pereodic_task.await.unwrap();
 }
 
@@ -67,7 +75,7 @@ fn report_exit(task_name: &str, outcome: Result<Result<(), impl Debug + Display>
 
 async fn start_test(
     app: Arc<AppContext>,
-    endpoint: Arc<EndpointConfig>,
+    endpoint: Arc<EnvConfig>,
 ) -> Result<(), tonic::transport::Error> {
     loop {
         if app.is_shutting_down() {

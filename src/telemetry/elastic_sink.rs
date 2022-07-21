@@ -2,6 +2,7 @@ use std::sync::{Arc};
 use std::net::SocketAddr;
 use std::time::Duration;
 
+use log::debug;
 use tokio::io::AsyncWriteExt;
 use tokio::{
     net::TcpStream,
@@ -92,7 +93,7 @@ async fn log_flusher_thread(
             let send_res = stream.write(&res).await;
             match send_res {
                 Ok(size) => {
-                    println!("Send logs {:?}", size)
+                    debug!("Send logs {:?}", size)
                 }
                 Err(err) => println!("Can't write logs to logstash server {:?}", err),
             }
