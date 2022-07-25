@@ -1,52 +1,59 @@
+use rust_service_template::app::app_ctx::GetGlobalState;
 use rust_service_template::app::AppContext;
-use rust_service_template::configuration::{EnvConfig, SettingsReader};
-use rust_service_template::server::{run_grpc_server, run_http_server};
+use rust_service_template::application::Application;
+use rust_service_template::configuration::EnvConfig;
 use rust_service_template::settings_model::SettingsModel;
-use rust_service_template::telemetry::{get_subscriber, init_subscriber, ElasticSink};
-use std::fmt::{format, Debug, Display};
-use std::sync::atomic::Ordering;
+use std::fmt::{Debug, Display};
 use std::sync::Arc;
 use tokio::signal;
+use tokio::sync::broadcast;
 use tokio::task::JoinError;
 
 #[tokio::main]
 async fn main() {
-    let settings = SettingsReader::read_settings::<SettingsModel>()
-        .await
-        .expect("Can't get settings!");
+    let application = Application
+    ::<AppContext, SettingsModel>
+    ::init(AppContext::new).await;
 
-    let app = Arc::new(AppContext::new(&settings));
+    let context = application.context.clone();
+    let sink = application.start_logger();
+    let (grpc_server, http_server) = application
+        .start_hosting(move |server| {
+            let bookstore =
+                rust_service_template::services::BookStoreImpl::new(context.database.clone());
 
-    let env_config = Arc::new(SettingsReader::read_env_settings());
-    let sink = ElasticSink::new(
-        "192.168.70.8:5044".to_string().parse().unwrap(),
-        app.clone(),
-    );
-    let subscriber = get_subscriber(
-        "rust_service_template".into(),
-        "info".into(),
-        move || sink.create_writer(),
-        env_config.index.clone(),
-        env_config.environment.clone(),
-    );
-    init_subscriber(subscriber);
+            server.borrow_mut().add_service(
+                rust_service_template::generated_proto::bookstore_server::BookstoreServer::new(
+                    bookstore,
+                ),
+            )
+        })
+        .await;
+
     //JUST A GRPC EXAMPLE
-    let client_pereodic_task = tokio::spawn(start_test(app.clone(), env_config.clone()));
+    let client_pereodic_task = tokio::spawn(start_test(
+        application.context.clone(),
+        application.env_config.clone(),
+    ));
 
-    let grpc_server = tokio::spawn(run_grpc_server(env_config.clone(), app.clone()));
-    let http_server = tokio::spawn(run_http_server(env_config.clone(), app.clone()));
-
+    let (tx, _) = broadcast::channel(16);
+    let mut rx2 = tx.subscribe();
     tokio::select! {
         _ = signal::ctrl_c() => {
             println!("Stop signal received!");
-            let shut_down = app.states.shutting_down.clone();
-            shut_down.store(true, Ordering::Relaxed);
+            application.context.shutting_down();
+            tx.send(true).unwrap_or_default();
         },
         o = grpc_server => {report_exit("GRPC_SERVER", o);}
         o = http_server => {report_exit("GRPC_SERVER", o);}
     };
 
-    client_pereodic_task.await.unwrap();
+    let shut_thread = tokio::spawn(async move { rx2.recv().await });
+    tokio::select! {
+        o = client_pereodic_task => {report_exit("EXIT CLIENT", o);}
+        _ = shut_thread => {}
+    };
+    sink.finalize_logs().await;
 }
 
 fn report_exit(task_name: &str, outcome: Result<Result<(), impl Debug + Display>, JoinError>) {
@@ -78,11 +85,11 @@ async fn start_test(
     endpoint: Arc<EnvConfig>,
 ) -> Result<(), tonic::transport::Error> {
     loop {
+        tokio::time::sleep(std::time::Duration::from_millis(10_000)).await;
         if app.is_shutting_down() {
             println!("STOP CLIENT");
             return Ok(());
         }
-        tokio::time::sleep(std::time::Duration::from_millis(10_000)).await;
         let mut client =
             rust_service_template::generated_proto::bookstore_client::BookstoreClient::connect(
                 format!("http://{}:{}", endpoint.base_url, endpoint.grpc_port),

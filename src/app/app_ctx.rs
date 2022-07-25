@@ -19,12 +19,30 @@ impl AppContext {
             database: Arc::new(DatabaseImpl::new()),
         }
     }
+}
 
-    pub fn is_initialized(&self) -> bool {
+impl GetGlobalState for AppContext {
+    fn is_initialized(&self) -> bool {
         self.states.is_initialized()
     }
 
-    pub fn is_shutting_down(&self) -> bool {
+    fn is_shutting_down(&self) -> bool {
         self.states.is_shutting_down()
     }
+
+    fn shutting_down(&self) {
+         self.states.shutting_down.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+pub trait GetGlobalState {
+    fn is_initialized(&self) -> bool;
+
+    fn is_shutting_down(&self) -> bool;
+
+    fn shutting_down(&self);
+}
+
+pub trait GetLogStashUrl {
+    fn get_logstash_url(&self) -> String;
 }

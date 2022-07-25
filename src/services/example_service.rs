@@ -4,16 +4,17 @@ use tonic::{Request, Response, Status};
 use tracing::instrument;
 
 use crate::app::AppContext;
+use crate::domain::{Database, RequestCounter};
 use crate::generated_proto::rust_grpc_service::bookstore_server::Bookstore;
 use crate::generated_proto::rust_grpc_service::{GetBookRequest, GetBookResponse};
 
 pub struct BookStoreImpl {
-    app: Arc<AppContext>,
+    database: Arc<dyn Database<RequestCounter> + Sync + Send>,
 }
 
 impl BookStoreImpl {
-    pub fn new(app: Arc<AppContext>) -> Self {
-        BookStoreImpl { app }
+    pub fn new(database: Arc<dyn Database<RequestCounter> + Sync + Send>) -> Self {
+        BookStoreImpl { database }
     }
 }
 
@@ -29,10 +30,10 @@ impl Bookstore for BookStoreImpl {
             author: "Peter".to_owned(),
             name: "Zero to One".to_owned(),
             year: 2014,
-            counter: self.app.database.read().await.counter
+            counter: self.database.read().await.counter
         };
 
-        self.app.database.increase().await;
+        self.database.increase().await;
 
         tracing::info!(
             message = "Sending reply.",
