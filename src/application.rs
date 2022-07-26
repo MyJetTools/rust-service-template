@@ -3,10 +3,7 @@ use std::sync::Arc;
 use serde::de::DeserializeOwned;
 
 use crate::{
-    app::{
-        app_ctx::{GetGlobalState, GetLogStashUrl},
-        AppContext,
-    },
+    app::app_ctx::{GetGlobalState, GetLogStashUrl},
     configuration::{EnvConfig, SettingsReader},
     server,
     telemetry::{get_subscriber, init_subscriber, ElasticSink},
@@ -43,7 +40,7 @@ where
 
     pub fn start_logger(&self) -> Arc<ElasticSink> {
         let sink = Arc::new(ElasticSink::new(
-            self.settings.get_logstash_url().parse().unwrap()
+            self.settings.get_logstash_url().parse().unwrap(),
         ));
         let clone = sink.clone();
         let subscriber = get_subscriber(
@@ -60,9 +57,14 @@ where
     pub async fn start_hosting<Func>(
         &self,
         register_services: Func,
-    ) -> (tokio::task::JoinHandle<Result<(), std::io::Error>>, tokio::task::JoinHandle<Result<(), hyper::Error>>)
+    ) -> (
+        tokio::task::JoinHandle<Result<(), anyhow::Error>>,
+        tokio::task::JoinHandle<Result<(), anyhow::Error>>,
+    )
     where
-        Func: Fn(Box<std::cell::RefCell<tonic::transport::Server>>) -> tonic::transport::server::Router
+        Func: Fn(
+                Box<std::cell::RefCell<tonic::transport::Server>>,
+            ) -> tonic::transport::server::Router
             + Send
             + Sync
             + 'static,
@@ -74,5 +76,71 @@ where
         let http_server = tokio::spawn(server::run_http_server(self.env_config.clone()));
 
         (grpc_server, http_server)
+    }
+
+    pub async fn wait_for_termination(
+        &self,
+        sink: Arc<ElasticSink>,
+        grpc_server: tokio::task::JoinHandle<Result<(), anyhow::Error>>,
+        http_server: tokio::task::JoinHandle<Result<(), anyhow::Error>>,
+        tasks: &mut Vec<tokio::task::JoinHandle<Result<(), anyhow::Error>>>,
+    ) {
+        let cancellation_token = tokio_util::sync::CancellationToken::new();
+        let shut_func = || {
+            self.context.shutting_down();
+            cancellation_token.cancel();
+        };
+
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {
+                println!("Stop signal received!");
+                shut_func();
+            },
+            o = grpc_server => {
+                report_exit("GRPC_SERVER", o);
+                shut_func();
+            }
+            o = http_server => {
+                report_exit("HTTP_SERVER", o);
+                shut_func();
+            }
+        };
+        
+        // This is how shut down tasks
+        while let Some(task) = tasks.pop(){
+            tokio::select! {
+                _ = task => {},
+                _ = cancellation_token.cancelled() => {},
+            };
+        }
+
+        sink.finalize_logs().await;
+    }
+}
+
+fn report_exit(
+    task_name: &str,
+    outcome: Result<Result<(), impl std::fmt::Debug + std::fmt::Display>, tokio::task::JoinError>,
+) {
+    match outcome {
+        Ok(Ok(())) => {
+            tracing::info!("{} has exited", task_name)
+        }
+        Ok(Err(e)) => {
+            tracing::error!(
+                error.cause_chain = ?e,
+                error.message = %e,
+                "{} failed",
+                task_name
+            )
+        }
+        Err(e) => {
+            tracing::error!(
+                error.cause_chain = ?e,
+                error.message = %e,
+                "{}' task failed to complete",
+                task_name
+            )
+        }
     }
 }

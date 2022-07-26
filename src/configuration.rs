@@ -28,14 +28,14 @@ impl SettingsReader {
         let http_port = std::env::var("HTTP_PORT".to_string()).unwrap_or("8080".into());
         let grpc_port = std::env::var("GRPC_PORT".to_string()).unwrap_or("80".into());
         let base_url = (match environment.as_str() {
-            _ => {"127.0.0.1"},
             "uat" | "test" | "prod" => {"0.0.0.0"},
+            _ => {"127.0.0.1"},
         }).to_string();
         let index = (match environment.as_str() {
-            _ => "jet-logs-*uat*",
             "uat" => "jet-logs-*uat*",
             "test" => "jet-logs-test*",
             "prod" => "jet-logs-prod*",
+            _ => "jet-logs-*uat*",
         }).to_string();
 
         EnvConfig {

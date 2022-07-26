@@ -10,7 +10,7 @@ use crate::{
 pub async fn run_grpc_server<Func>(
     env_config: Arc<EnvConfig>,
     register_services: Func,
-) -> Result<(), std::io::Error>
+) -> Result<(), anyhow::Error>
 where
     Func: Fn(Box<RefCell<Server>>) -> Router,
 {
@@ -19,7 +19,7 @@ where
         .unwrap();
 
     println!("GRPC server listening on {}", addr);
-    let mut builder = tonic::transport::Server::builder().trace_fn(|req| {
+    let builder = tonic::transport::Server::builder().trace_fn(|req| {
         tracing::info_span!(
             "grpc_call",
             grpc_request = format!("{:?}", req),
@@ -52,7 +52,7 @@ pub struct IsAlive {
     version: String,
 }
 
-pub async fn run_http_server(env_config: Arc<EnvConfig>) -> Result<(), hyper::Error> {
+pub async fn run_http_server(env_config: Arc<EnvConfig>) -> Result<(), anyhow::Error> {
     let addr = format!("{}:{}", env_config.base_url, env_config.http_port)
         .parse()
         .unwrap();

@@ -15,8 +15,6 @@ use tokio::{
 
 use tokio::net::TcpSocket;
 
-use crate::app::app_ctx::GetGlobalState;
-
 pub struct ElasticSink {
     buffer: Arc<RwLock<Vec<Vec<u8>>>>,
     sender: UnboundedSender<Vec<u8>>,

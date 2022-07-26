@@ -3,7 +3,6 @@ use std::sync::Arc;
 use tonic::{Request, Response, Status};
 use tracing::instrument;
 
-use crate::app::AppContext;
 use crate::domain::{Database, RequestCounter};
 use crate::generated_proto::rust_grpc_service::bookstore_server::Bookstore;
 use crate::generated_proto::rust_grpc_service::{GetBookRequest, GetBookResponse};

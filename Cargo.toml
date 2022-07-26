@@ -17,6 +17,7 @@ name = "rust-service-template"
 
 #Runtime
 tokio = { version = "*", features = ["full"] }
+tokio-util = "0.7.3"
 hyper = {version="*"}
 rand = "*"
 anyhow = "*"
