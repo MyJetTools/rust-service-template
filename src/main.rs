@@ -1,7 +1,6 @@
-use rust_service_template::app::app_ctx::GetGlobalState;
+use rust_service_sdk::app::app_ctx::GetGlobalState;
+use rust_service_sdk::application::Application;
 use rust_service_template::app::AppContext;
-use rust_service_template::application::Application;
-use rust_service_template::configuration::EnvConfig;
 use rust_service_template::settings_model::SettingsModel;
 use std::sync::Arc;
 
@@ -30,12 +29,12 @@ async fn main() {
         application.env_config.clone(),
     ));
     let mut running_tasks = vec![client_pereodic_task];
-    application.wait_for_termination(sink, grpc_server, http_server, &mut running_tasks).await;
+    application.wait_for_termination(sink, grpc_server, http_server, &mut running_tasks, None).await;
 }
 
 async fn start_test(
     app: Arc<AppContext>,
-    endpoint: Arc<EnvConfig>,
+    endpoint: Arc<rust_service_sdk::configuration::EnvConfig>,
 ) -> Result<(), anyhow::Error> {
     loop {
         tokio::time::sleep(std::time::Duration::from_millis(3_333)).await;

@@ -18,7 +18,7 @@ pub struct SettingsModelInner {
     pub log_stash_url: String,
 }
 
-impl crate::app::app_ctx::GetLogStashUrl for SettingsModel {
+impl rust_service_sdk::app::app_ctx::GetLogStashUrl for SettingsModel {
     fn get_logstash_url(&self) -> String {
         self.inner.log_stash_url.clone()
     }
