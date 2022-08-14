@@ -1,35 +1,43 @@
-use rust_service_sdk::app::app_ctx::GetGlobalState;
+use rust_service_sdk::app::app_ctx::{GetGlobalState, InitGrpc};
 use rust_service_sdk::application::Application;
 use rust_service_template::app::AppContext;
 use rust_service_template::settings_model::SettingsModel;
+use tokio_util::sync::CancellationToken;
 use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
-    let application = Application::<AppContext, SettingsModel>::init(AppContext::new).await;
+    let mut application = Application::<AppContext, SettingsModel>::init(AppContext::new).await;
 
-    let context = application.context.clone();
-    let sink = application.start_logger();
-    let (grpc_server, http_server) = application
-        .start_hosting(move |server| {
-            let bookstore =
-                rust_service_template::services::BookStoreImpl::new(context.database.clone());
+    let clone = application.context.clone();
+    let func = move |server| clone.init_grpc(server);
+    
+    let sink = application.start_hosting(func).await;
 
-            server.borrow_mut().add_service(
-                rust_service_template::generated_proto::bookstore_server::BookstoreServer::new(
-                    bookstore,
-                ),
-            )
-        })
+    //In case to stop application we can cancel token
+    let token = Arc::new(CancellationToken::new());
+    
+    // setup custome code
+
+    let task = tokio::spawn(start_test(application.context.clone()
+    , application.env_config.clone()));
+    let mut running_tasks = vec![task];
+
+    application
+        .wait_for_termination(
+            sink,
+            &mut running_tasks,
+            Some(token.clone()),
+            graceful_shutdown_func,
+            600, // how many msec wail to exeucte graceful_shutdown_func
+        )
         .await;
+}
 
-    //JUST A GRPC EXAMPLE
-    let client_pereodic_task = tokio::spawn(start_test(
-        application.context.clone(),
-        application.env_config.clone(),
-    ));
-    let mut running_tasks = vec![client_pereodic_task];
-    application.wait_for_termination(sink, grpc_server, http_server, &mut running_tasks, None).await;
+async fn graceful_shutdown_func(context: Arc<AppContext>) -> bool {
+    let mut guard = context.some_counter.lock().await;
+    *guard += 1;
+    true
 }
 
 async fn start_test(

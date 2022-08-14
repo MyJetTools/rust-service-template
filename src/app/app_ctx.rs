@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
-use crate::{settings_model::SettingsModel, domain::{Database, RequestCounter, DatabaseImpl}};
+use tokio::sync::{Mutex};
 
-pub const APP_VERSION: &'static str = env!("CARGO_PKG_VERSION");
+use crate::{settings_model::SettingsModel, domain::{Database, RequestCounter, DatabaseImpl}};
 
 pub struct AppContext {
     pub states: rust_service_sdk::app::global_states::GlobalStates,
-    pub database: Arc<dyn Database<RequestCounter> + Sync + Send>
+    pub database: Arc<dyn Database<RequestCounter> + Sync + Send>,
+    pub some_counter: Arc<Mutex<u64>>,
 }
 
 impl AppContext {
@@ -15,6 +16,7 @@ impl AppContext {
         Self {
             states: rust_service_sdk::app::global_states::GlobalStates::new(),
             database: Arc::new(DatabaseImpl::new()),
+            some_counter: Arc::new(Mutex::new(0))
         }
     }
 }
@@ -32,3 +34,18 @@ impl rust_service_sdk::app::app_ctx::GetGlobalState for AppContext {
          self.states.shutting_down.store(true, std::sync::atomic::Ordering::Relaxed);
     }
 }
+
+
+impl rust_service_sdk::app::app_ctx::InitGrpc for AppContext {
+    fn init_grpc(
+        &self,
+        server: Box<std::cell::RefCell<tonic::transport::Server>>,
+    ) -> tonic::transport::server::Router {
+        
+        let bookstore = crate::services::BookStoreImpl::new(self.database.clone());
+
+        server.borrow_mut()
+            .add_service(crate::generated_proto::bookstore_server::BookstoreServer::new(bookstore),)
+    }
+}
+
