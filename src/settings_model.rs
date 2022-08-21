@@ -21,5 +21,6 @@ pub struct SettingsModelInner {
 impl rust_service_sdk::app::app_ctx::GetLogStashUrl for SettingsModel {
     fn get_logstash_url(&self) -> String {
         self.inner.log_stash_url.clone()
+        //USE ONLY CONSOLE SINK"".to_string()
     }
 }

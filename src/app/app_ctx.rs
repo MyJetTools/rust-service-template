@@ -11,7 +11,7 @@ pub struct AppContext {
 }
 
 impl AppContext {
-    pub fn new(settings: &SettingsModel) -> Self {
+    pub fn new(_: &SettingsModel) -> Self {
 
         Self {
             states: rust_service_sdk::app::global_states::GlobalStates::new(),

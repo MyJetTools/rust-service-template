@@ -16,7 +16,7 @@ name = "rust-service-template"
 [dependencies]
 
 #Runtime
-rust-service-sdk = { branch = "0.1.5", git = "https://github.com/MyJetTools/rust-service-sdk.git" }
+rust-service-sdk = { branch = "0.1.6", git = "https://github.com/MyJetTools/rust-service-sdk.git" }
 tokio = { version = "*", features = ["full"] }
 tokio-util = "0.7.3"
 hyper = {version="*"}
@@ -54,3 +54,4 @@ tracing-core = "0.1.10"
 
 [build-dependencies]
 tonic-build = { version = "*", features = ["prost"] }
+#openssl = { version = "0.9.17", features = ["vendored"] }
