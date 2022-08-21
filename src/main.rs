@@ -19,9 +19,9 @@ async fn main() {
     
     // setup custome code
 
-    let task = tokio::spawn(start_test(application.context.clone()
-    , application.env_config.clone()));
-    let mut running_tasks = vec![task];
+    //let task = tokio::spawn(start_test(application.context.clone()
+    //, application.env_config.clone()));
+    let mut running_tasks = vec![];//task];
 
     application
         .wait_for_termination(
