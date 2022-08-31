@@ -2,8 +2,9 @@ use rust_service_sdk::app::app_ctx::{GetGlobalState, InitGrpc};
 use rust_service_sdk::application::Application;
 use rust_service_template::app::AppContext;
 use rust_service_template::settings_model::SettingsModel;
-use tokio_util::sync::CancellationToken;
+use rust_service_template_client::ExampleClientBuilder;
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
 
 #[tokio::main]
 async fn main() {
@@ -11,17 +12,20 @@ async fn main() {
 
     let clone = application.context.clone();
     let func = move |server| clone.init_grpc(server);
-    
+
     let sink = application.start_hosting(func).await;
 
     //In case to stop application we can cancel token
     let token = Arc::new(CancellationToken::new());
-    
+
     // setup custome code
 
-    //let task = tokio::spawn(start_test(application.context.clone()
-    //, application.env_config.clone()));
-    let mut running_tasks = vec![];//task];
+    let task = tokio::spawn(start_test(
+        application.context.clone(),
+        application.env_config.clone(),
+    ));
+
+    let mut running_tasks = vec![task];
 
     application
         .wait_for_termination(
@@ -50,13 +54,13 @@ async fn start_test(
             println!("STOP CLIENT");
             return Ok(());
         }
-        let mut client =
-            rust_service_template::generated_proto::bookstore_client::BookstoreClient::connect(
-                format!("http://{}:{}", endpoint.base_url, endpoint.grpc_port),
-            )
-            .await?;
+        let mut client = ExampleClientBuilder::new(format!(
+            "http://{}:{}",
+            endpoint.base_url, endpoint.grpc_port
+        ))
+        .await;
 
-        let request = tonic::Request::new(rust_service_template::generated_proto::GetBookRequest {
+        let request = tonic::Request::new(rust_service_template_generated_proto::GetBookRequest {
             id: "123".into(),
         });
 

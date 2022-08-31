@@ -4,8 +4,8 @@ use tonic::{Request, Response, Status};
 use tracing::instrument;
 
 use crate::domain::{Database, RequestCounter};
-use crate::generated_proto::rust_grpc_service::bookstore_server::Bookstore;
-use crate::generated_proto::rust_grpc_service::{GetBookRequest, GetBookResponse};
+use rust_service_template_generated_proto::rust_grpc_service::bookstore_server::Bookstore;
+use rust_service_template_generated_proto::rust_grpc_service::{GetBookRequest, GetBookResponse};
 
 pub struct BookStoreImpl {
     database: Arc<dyn Database<RequestCounter> + Sync + Send>,

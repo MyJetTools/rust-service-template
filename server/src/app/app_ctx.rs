@@ -45,7 +45,7 @@ impl rust_service_sdk::app::app_ctx::InitGrpc for AppContext {
         let bookstore = crate::services::BookStoreImpl::new(self.database.clone());
 
         server.borrow_mut()
-            .add_service(crate::generated_proto::bookstore_server::BookstoreServer::new(bookstore),)
+            .add_service(rust_service_template_generated_proto::bookstore_server::BookstoreServer::new(bookstore),)
     }
 }
 
