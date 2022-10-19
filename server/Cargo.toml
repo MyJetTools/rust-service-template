@@ -18,7 +18,7 @@ name = "rust-service-template"
 rust-service-template-generated-proto = { path = "../generated_proto" } 
 rust-service-template-client = { path = "../client" } 
 #Runtime
-rust-service-sdk = { tag = "0.1.8", git = "https://github.com/MyJetTools/rust-service-sdk.git" }
+rust-service-sdk = { tag = "0.1.16", git = "https://github.com/MyJetTools/rust-service-sdk.git" }
 tokio = { version = "*", features = ["full"] }
 tokio-util = "0.7.3"
 hyper = {version="*"}
