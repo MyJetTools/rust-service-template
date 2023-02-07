@@ -13,7 +13,7 @@ async fn main() {
     let clone = application.context.clone();
     let func = move |server| clone.init_grpc(server);
 
-    let sink = application.start_hosting(func).await;
+    let sink = application.start_hosting(func, "rust-service-template".to_string()).await;
 
     //In case to stop application we can cancel token
     let token = Arc::new(CancellationToken::new());

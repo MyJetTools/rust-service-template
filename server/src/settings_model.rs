@@ -1,12 +1,12 @@
 use serde::{Serialize, Deserialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SettingsModel {
     #[serde(rename = "RustServiceTemplateTest")]
     pub inner: SettingsModelInner,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SettingsModelInner {
     #[serde(rename = "ZipkinUrl")]
     pub zipkin_url: String,
