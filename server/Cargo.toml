@@ -26,7 +26,7 @@ rand = "*"
 anyhow = "*"
 lazy_static = "1.4.0"
 time = { version = "0.3", default-features = false, features = ["formatting"] }
-gethostname = "0.2.1"
+gethostname = "0.4.1"
 tonic = "0.8.0"
 prost = "0.11.0"
 uuid = {version = "*", features = [
@@ -60,6 +60,7 @@ my-no-sql-tcp-reader = { tag = "0.1.8", git = "https://github.com/MyJetTools/my-
 my-no-sql-server-abstractions = { tag = "0.1.1", git = "https://github.com/MyJetTools/my-no-sql-server-abstractions.git" }
 rust-extensions = { tag = "0.1.3", git = "https://github.com/MyJetTools/rust-extensions.git" }
 my-service-bus-tcp-client = { tag = "0.2.1", git = "https://github.com/MyJetTools/my-service-bus-tcp-client.git" }
+my-service-bus-shared = { tag = "0.3.2", git = "https://github.com/MyJetTools/my-service-bus-shared.git" }
 my-logger = { tag = "0.2.0", git = "https://github.com/MyJetTools/my-logger.git" }
 
 [build-dependencies]
